@@ -1,0 +1,19 @@
+services:
+  pgsql:
+    image: postgres:17
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: energy_communities
+      POSTGRES_USER: laravel
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgsql-data:/var/lib/postgresql/data
+      - ./docker/pgsql-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "laravel", "-d", "energy_communities"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgsql-data:
