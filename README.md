@@ -1,59 +1,94 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Energy Communities API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A small JSON API for the enixi Laravel coding challenge: energy communities, metering points and the
+registrations that connect them, plus the users who own and administer them.
 
-## About Laravel
+**Decisions, trade-offs, the BR-8 race-safety answer and what's missing are in [NOTES.md](NOTES.md).**
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Laravel 12, PHP 8.2+
+- PostgreSQL 17 (Docker), because an exclusion constraint enforces BR-7 at database level
+- Laravel Sanctum (personal access tokens)
+- PHPUnit
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Setup
 
-## Learning Laravel
+Requirements: PHP 8.2+ with `pdo_pgsql` enabled, Composer, Docker.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+```bash
+cp .env.example .env
+composer install
+php artisan key:generate
+docker compose up -d          # Postgres + a separate test database
+php artisan migrate --seed
+php artisan serve
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+The seeder creates five grid operators and two users (password `password`):
 
-## Laravel Sponsors
+| Email | Role |
+| --- | --- |
+| `admin@example.com` | platform admin (`is_admin`) |
+| `test@example.com` | normal user |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Tests
 
-### Premium Partners
+```bash
+php artisan test
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Tests run against the `energy_communities_test` database (see `phpunit.xml`), so Postgres must be running.
+Business rules that live in the database (constraint, locks, scopes) are covered by feature tests against real
+Postgres; the registration state machine is unit tested. Details in NOTES.md.
 
-## Contributing
+## Authentication
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+curl -X POST http://127.0.0.1:8000/api/login \
+  -H "Accept: application/json" -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+```
 
-## Code of Conduct
+Send the returned token as `Authorization: Bearer <token>` on every other request.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Endpoints
 
-## Security Vulnerabilities
+| Method | Path | What it does | Rules |
+| --- | --- | --- | --- |
+| POST | `/api/login` | e-mail + password, returns a token | |
+| GET | `/api/me` | the authenticated user | |
+| POST | `/api/meter-points` | register a metering point of your own | BR-1, BR-2 |
+| GET | `/api/meter-points` | own metering points (admins: all); `?energy_direction=` | BR-2 |
+| POST | `/api/energy-communities` | create; creator becomes manager, state `new` | BR-3 |
+| GET | `/api/energy-communities` | communities you belong to (admins: all); `?state=`; paginated | BR-11 |
+| GET | `/api/energy-communities/{energyCommunity}` | details and members; members and admins only | BR-11 |
+| POST | `/api/energy-communities/{energyCommunity}/users` | a manager adds a user with a role | BR-4 |
+| POST | `/api/energy-communities/{energyCommunity}/meter-points` | register a metering point into the community | BR-5 to BR-8 |
+| GET | `/api/energy-communities/{energyCommunity}/meter-points` | the community's registrations; `?state=` | BR-11 |
+| POST | `/api/registrations/{registration}/transition` | apply a state-machine transition | BR-8, BR-9 |
+| DELETE | `/api/registrations/{registration}` | end the registration (never a hard delete) | BR-10 |
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Request bodies use the field names from the brief, e.g.:
 
-## License
+```json
+POST /api/energy-communities/{energyCommunity}/meter-points
+{ "meter_point_id": 42, "from_date": "2026-04-01", "to_date": null, "consent_date": "2026-03-20" }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+POST /api/registrations/{registration}/transition
+{ "state": "error", "status_code": 4711 }
+```
+
+Status codes: `403` = not allowed for you, `409` = allowed but conflicts with the current state
+(e.g. overlapping registration, forbidden transition), `422` = invalid input.
+
+## Where things live
+
+| Folder | Contents |
+| --- | --- |
+| `app/Enums` | backed enums from the brief; the BR-9 state machine is on `EnergyCommunityMeterPointState` |
+| `app/Actions` | business logic (transactions, locks, rule checks) called by thin controllers |
+| `app/Policies` | who may do what (403) |
+| `app/Rules` | BR-1 validation rules |
+| `app/Http` | controllers, form requests, JSON resources |
+| `database/migrations` | schema from the brief, plus the BR-7 exclusion constraint |
