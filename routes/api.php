@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Controllers\Api\EnergyCommunityController;
+use App\Http\Controllers\Api\EnergyCommunityMeterPointController;
 use App\Http\Controllers\Api\EnergyCommunityUserController;
 use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\MeterPointController;
+use App\Http\Controllers\Api\RegistrationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -23,5 +25,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/energy-communities/{energyCommunity}/users', [EnergyCommunityUserController::class, 'store'])->name('energy-communities.users.store');
 
-    /// P2 / P3 endpoints go here.
+    // P2: registrations
+    Route::get('/energy-communities/{energyCommunity}/meter-points', [EnergyCommunityMeterPointController::class, 'index'])->name('energy-communities.meter-points.index');
+    Route::post('/energy-communities/{energyCommunity}/meter-points', [EnergyCommunityMeterPointController::class, 'store'])->name('energy-communities.meter-points.store');
+
+    Route::post('/registrations/{registration}/transition', [RegistrationController::class, 'transition'])->name('registrations.transition');
+    Route::delete('/registrations/{registration}', [RegistrationController::class, 'destroy'])->name('registrations.destroy');
+
+    // P3 endpoints go here.
 });
