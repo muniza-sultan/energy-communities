@@ -199,7 +199,19 @@ What I would change: a real foreign key. Steps, each deployable on its own:
 
 ## Deviations from the brief
 
-- _None so far._
+Table names, column names and enum values are exactly as given. Where I added to or went beyond the brief:
+
+- **`GET /api/me`** is an extra endpoint (not in the brief). It returns the authenticated user and is used to
+  show that a login token authenticates.
+- **`EnergyCommunityUserRole` enum** (`manager` | `member`) is my addition. The brief names three enums and
+  none for `energy_community_user.role`; casting the role to an enum keeps it type-safe like the others.
+- **`GET /api/meter-points` is paginated** (15 per page), although the brief asks for pagination only on the
+  community list. An admin sees all metering points, so an unpaginated list would grow without bound.
+- **`users` table:** besides the brief's columns it keeps Laravel's default `email_verified_at` and
+  `remember_token`. The skeleton's other tables (`password_reset_tokens`, `sessions`, `cache`, `jobs`) are
+  also left in place. Harmless defaults of a fresh Laravel 12 project, not used by the API.
+- **Extra indexes and constraints** beyond the brief's column list: indexes on foreign keys Postgres doesn't
+  index by itself, a CHECK `to_date >= from_date`, and the BR-7 exclusion constraint.
 
 ## What's missing / next steps
 
