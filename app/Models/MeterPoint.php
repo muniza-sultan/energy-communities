@@ -24,6 +24,14 @@ class MeterPoint extends Model
     }
 
     /**
+     * BR-1: the first 8 characters of the code identify the grid operator.
+     */
+    public static function gridOperatorIdentifierFrom(string $code): string
+    {
+        return substr($code, 0, 8);
+    }
+
+    /**
      * exactly one owner.
      *
      * @return BelongsTo<User, $this>
