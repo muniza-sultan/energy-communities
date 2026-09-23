@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -48,5 +50,24 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsToMany<EnergyCommunity, $this>
+     */
+    public function energyCommunities(): BelongsToMany
+    {
+        return $this->belongsToMany(EnergyCommunity::class)
+            ->using(EnergyCommunityUser::class)
+            ->withPivot(['id', 'role'])
+            ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<MeterPoint, $this>
+     */
+    public function meterPoints(): HasMany
+    {
+        return $this->hasMany(MeterPoint::class);
     }
 }
