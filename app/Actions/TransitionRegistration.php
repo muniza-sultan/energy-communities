@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\EnergyCommunityMeterPointState as State;
 use App\Exceptions\ConflictException;
+use App\Exceptions\RegistrationAlreadyEnded;
 use App\Models\EnergyCommunityMeterPoint;
 use App\Models\MeterPoint;
 use Carbon\CarbonImmutable;
@@ -23,16 +24,47 @@ class TransitionRegistration
     /** SQLSTATE for exclusion_violation (the BR-7 constraint). */
     private const EXCLUSION_VIOLATION = '23P01';
 
+    /**
+     * Move the registration to $target (transition endpoint).
+     */
     public function handle(EnergyCommunityMeterPoint $registration, State $target, ?int $statusCode = null): EnergyCommunityMeterPoint
     {
+        return $this->apply($registration, fn (State $current) => $target, $statusCode);
+    }
+
+    /**
+     * End the registration (BR-10 DELETE, BR-13 reject): accepted -> deactivated,
+     * earlier states -> removed. The end state is decided from the state read
+     * *after* the lock, so a concurrent change can't make us pick a stale one.
+     *
+     * @return EnergyCommunityMeterPoint|null null if it had already ended
+     */
+    public function end(EnergyCommunityMeterPoint $registration): ?EnergyCommunityMeterPoint
+    {
         try {
-            return DB::transaction(function () use ($registration, $target, $statusCode) {
+            return $this->apply(
+                $registration,
+                fn (State $current) => $current->endState() ?? throw new RegistrationAlreadyEnded,
+            );
+        } catch (RegistrationAlreadyEnded) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  callable(State): State  $resolveTarget  gets the current (locked) state, returns the target
+     */
+    private function apply(EnergyCommunityMeterPoint $registration, callable $resolveTarget, ?int $statusCode = null): EnergyCommunityMeterPoint
+    {
+        try {
+            return DB::transaction(function () use ($registration, $resolveTarget, $statusCode) {
                 // Lock order: metering point -> registration (see NOTES.md).
                 // withTrashed: a deleted metering point's registration can still be ended.
                 MeterPoint::withTrashed()->whereKey($registration->meter_point_id)->lockForUpdate()->first();
 
                 $registration = EnergyCommunityMeterPoint::whereKey($registration->id)->lockForUpdate()->firstOrFail();
                 $current = $registration->state;
+                $target = $resolveTarget($current);
 
                 if (! $current->canTransitionTo($target)) {
                     throw new ConflictException("A registration cannot move from {$current->value} to {$target->value}.");

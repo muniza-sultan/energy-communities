@@ -42,10 +42,8 @@ class RegistrationController extends Controller
     {
         Gate::authorize('delete', $registration);
 
-        $endState = $registration->state->endState()
+        $transition->end($registration)
             ?? throw new ConflictException('This registration has already ended.');
-
-        $transition->handle($registration, $endState);
 
         return response()->noContent();
     }

@@ -32,5 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/registrations/{registration}/transition', [RegistrationController::class, 'transition'])->name('registrations.transition');
     Route::delete('/registrations/{registration}', [RegistrationController::class, 'destroy'])->name('registrations.destroy');
 
-    // P3 endpoints go here.
+    // P3: community lifecycle
+    Route::post('/energy-communities/{energyCommunity}/activate', [EnergyCommunityController::class, 'activate'])->name('energy-communities.activate');
+    Route::post('/energy-communities/{energyCommunity}/reject', [EnergyCommunityController::class, 'reject'])->name('energy-communities.reject');
 });

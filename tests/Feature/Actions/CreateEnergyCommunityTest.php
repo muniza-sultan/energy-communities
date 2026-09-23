@@ -18,7 +18,7 @@ class CreateEnergyCommunityTest extends TestCase
     #[Test]
     public function nothing_is_written_if_the_manager_row_fails(): void
     {
-        // BR-3: community + manager row are one atomic operation.
+       
         EnergyCommunityUser::creating(fn () => throw new RuntimeException('simulated failure'));
 
         try {

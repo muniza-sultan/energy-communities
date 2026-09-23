@@ -6,7 +6,7 @@
 - [x] Schema, enums, models, factories, grid operator seeder
 - [x] P1 Foundation: login, meter points, energy communities (create/list/show), adding users
 - [x] P2 Registrations: register, list, transition, delete (end)
-- [ ] P3 Community lifecycle
+- [x] P3 Community lifecycle: activate (BR-12), reject (BR-13)
 - [ ] OPT
 
 ## Running it
@@ -39,6 +39,13 @@ php artisan test
 - **Business logic in action classes** (`app/Actions`), called from controllers. Actions that check state
   lock the row they check (`lockForUpdate`), e.g. adding a user locks the community so a concurrent reject
   can't slip in between.
+- **Ending a registration decides the end state after the lock.** `TransitionRegistration::end()` (used by
+  DELETE and reject) reads the state under the row lock and only then picks `deactivated` or `removed`, so a
+  concurrent change can't make it pick a stale transition. Reject skips registrations that ended meanwhile.
+- **Reject is one transaction** around the community update and every registration transition (the nested
+  transactions become savepoints). A failure anywhere rolls the whole reject back; there is a test for this.
+- **Activate locks the generation registration it relies on**, so a concurrent transition can't end it between
+  the check and the state change.
 - **Lock order** is always community -> metering point -> registration. Every action that locks more than one
   row takes them in this order, so two actions can't deadlock by waiting on each other.
 - **Soft-deleted metering points** keep their code reserved (the unique index includes them).
@@ -75,7 +82,9 @@ php artisan test
 | What "today" means (consent not in the future, closing a period) | The app timezone, UTC. In production this should be Europe/Vienna, so a consent given just after midnight local time isn't rejected |
 | `status_code` after leaving `error` (e.g. retry `error` -> `requested`) | Cleared (null). The column describes the *current* error only, so an accepted registration never carries an old error code. A full error history would need a transitions/audit table (see next steps) |
 | Response of `DELETE /api/registrations/{id}` | 204 No Content, following generic HTTP semantics for DELETE, even though the row is kept and only transitioned (BR-10) |
-| BR-12: must the accepted generation registration be valid today? | _Open, to decide_ |
+| BR-12: must the accepted generation registration be valid today? | Yes: `from_date <= today` and (`to_date` is null or `>= today`). A plant that joins next year, or left last year, feeds nothing now, so it can't justify activation. Registrations of soft-deleted metering points don't count |
+| BR-13: registrations in `error` when a community is rejected | Left as they are. BR-13 ends every *blocking* registration; `error` doesn't block, so it isn't touched (it can still be removed explicitly) |
+| Activate/reject preconditions not met (wrong state, no valid generator) | 409: the manager is allowed to do it, just not in the current state |
 
 ## BR-8: race safety
 

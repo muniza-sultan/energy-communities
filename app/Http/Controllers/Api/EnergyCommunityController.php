@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ActivateEnergyCommunity;
 use App\Actions\CreateEnergyCommunity;
+use App\Actions\RejectEnergyCommunity;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\EnergyCommunities\IndexEnergyCommunityRequest;
 use App\Http\Requests\Api\EnergyCommunities\StoreEnergyCommunityRequest;
@@ -65,5 +67,25 @@ class EnergyCommunityController extends Controller
         Gate::authorize('view', $energyCommunity);
 
         return EnergyCommunityResource::make($energyCommunity->load('memberships.user'));
+    }
+
+    /**
+     * POST /api/energy-communities/{energyCommunity}/activate (BR-12)
+     */
+    public function activate(EnergyCommunity $energyCommunity, ActivateEnergyCommunity $activate): EnergyCommunityResource
+    {
+        Gate::authorize('activate', $energyCommunity);
+
+        return EnergyCommunityResource::make($activate->handle($energyCommunity));
+    }
+
+    /**
+     * POST /api/energy-communities/{energyCommunity}/reject (BR-13)
+     */
+    public function reject(EnergyCommunity $energyCommunity, RejectEnergyCommunity $reject): EnergyCommunityResource
+    {
+        Gate::authorize('reject', $energyCommunity);
+
+        return EnergyCommunityResource::make($reject->handle($energyCommunity));
     }
 }

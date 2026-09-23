@@ -68,6 +68,8 @@ Send the returned token as `Authorization: Bearer <token>` on every other reques
 | GET | `/api/energy-communities/{energyCommunity}/meter-points` | the community's registrations; `?state=` | BR-11 |
 | POST | `/api/registrations/{registration}/transition` | apply a state-machine transition | BR-8, BR-9 |
 | DELETE | `/api/registrations/{registration}` | end the registration (never a hard delete) | BR-10 |
+| POST | `/api/energy-communities/{energyCommunity}/activate` | `new` -> `activated`; needs an accepted generation registration valid today | BR-12 |
+| POST | `/api/energy-communities/{energyCommunity}/reject` | `new`/`activated` -> `rejected`, ending every blocking registration, atomically | BR-13 |
 
 Request bodies use the field names from the brief, e.g.:
 
